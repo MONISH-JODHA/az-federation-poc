@@ -1,0 +1,73 @@
+name: "Cross-Tenant: Workload Identity Federation POC"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # manual trigger
+
+permissions:
+  id-token: write   # Required for OIDC token
+  contents: read
+
+env:
+  HOME_TENANT_ID: "2a3c08ee-32c0-4f1a-b07f-66a611ae4456"
+  # Cross-tenant app (registered as AzureADMultipleOrgs)
+  AZURE_CLIENT_ID: "a2160b58-03a7-4729-ae4f-9d1271247a13"
+  AZURE_SUBSCRIPTION_ID: "de1fd068-470d-4b01-8878-53281a3667c2"
+  # Set this to the real Tenant B ID when available
+  # FOREIGN_TENANT_ID: "<tenant-b-id>"
+
+jobs:
+  cross-tenant-access:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Login to Home Tenant (Tenant A) -- no secret, just OIDC
+      - name: Azure Login to Home Tenant (Federated - No Secret!)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.HOME_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: List Home Tenant resources
+        run: |
+          echo "=== HOME TENANT ==="
+          az account show --query "{Name:name, SubscriptionId:id, TenantId:tenantId}" -o table
+          echo ""
+          echo "=== Subscriptions ==="
+          az account list --query "[].{Name:name, Id:id}" -o table
+          echo ""
+          echo "=== Resource Groups ==="
+          az group list --query "[].{Name:name, Location:location}" -o table || echo "(none)"
+
+      # When Tenant B is available, uncomment this block:
+      # - name: Azure Login to Foreign Tenant (Federated - No Secret!)
+      #   uses: azure/login@v2
+      #   with:
+      #     client-id: ${{ env.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ env.FOREIGN_TENANT_ID }}
+      #     subscription-id: "<tenant-b-subscription-id>"
+      #
+      # - name: List Foreign Tenant resources
+      #   run: |
+      #     echo "=== FOREIGN TENANT ==="
+      #     az account show -o table
+      #     az group list -o table || echo "(none)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run cross-tenant Python script (no secrets!)
+        env:
+          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ env.HOME_TENANT_ID }}
+          HOME_TENANT_ID: ${{ env.HOME_TENANT_ID }}
+          # FOREIGN_TENANT_ID: ${{ env.FOREIGN_TENANT_ID }}
+        run: python cross_tenant_federated.py
