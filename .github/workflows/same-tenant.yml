@@ -3,16 +3,15 @@ name: "Same-Tenant: Workload Identity Federation POC"
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch: # manual trigger
 
 permissions:
-  id-token: write   # Required for OIDC token
+  id-token: write # Required for OIDC token
   contents: read
 
-env:
-  AZURE_TENANT_ID: "2a3c08ee-32c0-4f1a-b07f-66a611ae4456"
-  AZURE_CLIENT_ID: "65eb2294-49c4-4edc-b9fe-77c529f93e69"
-  AZURE_SUBSCRIPTION_ID: "de1fd068-470d-4b01-8878-53281a3667c2"
+# All credentials stored in GitHub Secrets -- nothing hardcoded
+# Set these in: Repo → Settings → Secrets and variables → Actions
+#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_SUBSCRIPTION_ID
 
 jobs:
   same-tenant-access:
@@ -23,9 +22,9 @@ jobs:
       - name: Azure Login (Federated - No Secret!)
         uses: azure/login@v2
         with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Verify Azure access via CLI
         run: |
@@ -51,6 +50,6 @@ jobs:
 
       - name: Run same-tenant Python script (no secrets!)
         env:
-          AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         run: python same_tenant_federated.py
