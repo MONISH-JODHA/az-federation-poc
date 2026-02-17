@@ -1,0 +1,29 @@
+az ad app federated-credential create --id a2160b58-03a7-4729-ae4f-9d1271247a13 --parameters '{"name":"github-actions-main","issuer":"https://token.actions.githubusercontent.com","subject":"repo:MONISH-JODHA/az-federation-poc:ref:refs/heads/main","audiences":["api://AzureADTokenExchange"],"description":"GitHub Actions OIDC for cross-tenant POC"}'
+
+az ad app federated-credential create --id 65eb2294-49c4-4edc-b9fe-77c529f93e69 --parameters '{"name":"github-actions-main","issuer":"https://token.actions.githubusercontent.com","subject":"repo:MONISH-JODHA/az-federation-poc:ref:refs/heads/main","audiences":["api://AzureADTokenExchange"],"description":"GitHub Actions OIDC for same-tenant POC"}'
+
+
+### Azure-to-Azure Setup (Tenant A accessing Tenant B without secrets) ###
+
+# Step 1: Create App Registration in Tenant B (target tenant)
+# Run this logged into Tenant B:
+az ad app create --display-name "az-to-az-federated-app" --sign-in-audience "AzureADMultipleOrgs"
+TENANT_B_APP_ID=$(az ad app list --display-name "az-to-az-federated-app" --query "[0].appId" -o tsv)
+az ad sp create --id $TENANT_B_APP_ID
+
+# Step 2: Add federated credential on Tenant B's app trusting Tenant A's identity
+# The issuer is Tenant A's Azure AD, subject is the client ID of Tenant A's app
+az ad app federated-credential create --id $TENANT_B_APP_ID --parameters '{
+  "name": "trust-tenant-a-identity",
+  "issuer": "https://login.microsoftonline.com/<TENANT_A_ID>/v2.0",
+  "subject": "<TENANT_A_APP_CLIENT_ID>",
+  "audiences": ["api://AzureADTokenExchange"],
+  "description": "Trust Tenant A identity for Azure-to-Azure federation"
+}'
+
+# Step 3: Assign RBAC on Tenant B's subscription
+az role assignment create --assignee $TENANT_B_APP_ID --role "Reader" --scope "/subscriptions/<TENANT_B_SUBSCRIPTION_ID>"
+
+# Step 4: Add GitHub Secrets
+# TENANT_B_ID = <Tenant B's tenant ID>
+# TENANT_B_APP_CLIENT_ID = $TENANT_B_APP_ID

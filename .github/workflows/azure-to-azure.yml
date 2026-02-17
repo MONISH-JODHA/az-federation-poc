@@ -1,4 +1,4 @@
-name: "Same-Tenant: Workload Identity Federation POC"
+name: "Azure-to-Azure: Workload Identity Federation POC"
 
 on:
   push:
@@ -10,24 +10,21 @@ permissions:
   contents: read
 
 jobs:
-  same-tenant-access:
+  azure-to-azure-access:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login (Federated)
+      - name: Azure Login as Tenant A Identity (Federated)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify Azure access via CLI
+      - name: Verify Tenant A access
         run: |
-          az account show --query "{Name:name, SubscriptionId:id, TenantId:tenantId, User:user.name}" -o table
-          az account list --query "[].{Name:name, Id:id, State:state}" -o table
-          az group list --query "[].{Name:name, Location:location}" -o table || echo "(none)"
-          az vm list --query "[].{Name:name, Location:location, Size:hardwareProfile.vmSize}" -o table || echo "(none)"
+          az account show --query "{Name:name, SubscriptionId:id, TenantId:tenantId}" -o table
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,8 +34,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run same-tenant script
+      - name: Run Azure-to-Azure script
         env:
+          TENANT_A_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TENANT_B_ID: ${{ secrets.TENANT_B_ID }}
+          TENANT_B_APP_CLIENT_ID: ${{ secrets.TENANT_B_APP_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        run: python same_tenant_federated.py
+        run: python azure_to_azure.py
