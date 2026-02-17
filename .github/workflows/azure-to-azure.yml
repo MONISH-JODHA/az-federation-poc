@@ -1,4 +1,4 @@
-name: "Azure-to-Azure: Workload Identity Federation POC"
+name: "Azure-to-Azure: Cross-Tenant Access POC"
 
 on:
   push:
@@ -15,17 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login as Tenant A Identity (Federated)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Verify Tenant A access
-        run: |
-          az account show --query "{Name:name, SubscriptionId:id, TenantId:tenantId}" -o table
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -34,11 +23,28 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Azure-to-Azure script
+      - name: Azure Login to Tenant A (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: List Tenant A resources
         env:
-          TENANT_A_ID: ${{ secrets.AZURE_TENANT_ID }}
-          TENANT_B_ID: ${{ secrets.TENANT_B_ID }}
-          TENANT_B_APP_CLIENT_ID: ${{ secrets.TENANT_B_APP_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        run: python azure_to_azure.py
+        run: python azure_to_azure.py tenant-a
+
+      - name: Azure Login to Tenant B (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TENANT_B_APP_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_B_ID }}
+          allow-no-subscriptions: true
+
+      - name: List Tenant B resources
+        env:
+          AZURE_TENANT_ID: ${{ secrets.TENANT_B_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.TENANT_B_APP_CLIENT_ID }}
+        run: python azure_to_azure.py tenant-b
